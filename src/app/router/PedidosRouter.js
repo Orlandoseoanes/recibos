@@ -49,12 +49,30 @@ router.get("/pedidos/sin-imprimir", async (req, res) => {
     return res.status(500).json({ error: "Error en el servidor" });
   }
 });
+const printPDFWindows = (filePath, printerName) => {
+  const command = `print /D:"${printerName}" "${filePath}"`;
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error('Error al imprimir el PDF:', err);
+      return;
+    }
+    console.log('PDF enviado a la impresora:', stdout);
+  });
+};
 
+const printPDF = (filePath, printerName) => {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    printPDFWindows(filePath, printerName);
+  } else {
+    console.error('Sistema operativo no soportado para la impresión');
+  }
+};
 router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
   try {
     const { impresora } = req.params;
 
-    const pedidos = await pedido.find({ Estado: 'Sin imprimir' });
+    const pedidos = await Pedido.find({ Estado: 'Sin imprimir' });
 
     if (pedidos.length === 0) {
       return res.status(404).json({ error: "No hay pedidos sin imprimir" });
@@ -75,8 +93,7 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
       const date = new Date(timestamp);
 
       doc.font("Helvetica")
-      .text("-----------------------------------", {})
-      doc
+        .text("-----------------------------------", {})
         .fontSize(12)
         .text("Refresqueria Union del Valle", {
           align: "center",
@@ -86,9 +103,7 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
           align: "center",
           underline: true,
         })
-        .moveDown(0.5);
-
-      doc
+        .moveDown(0.5)
         .fontSize(10)
         .text(`Fecha: ${date.toLocaleDateString()}`, { align: 'left' })
         .text(`Hora: ${date.toLocaleTimeString()}`, { align: 'left' })
@@ -104,7 +119,7 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
       await new Promise((resolve, reject) => {
         writeStream.on('finish', async () => {
           try {
-            await printer.print(outputPath, { printer: impresora });
+            printPDF(outputPath, impresora);
             await Pedido.findByIdAndUpdate(pedido._id, { Estado: 'Impreso' });
             console.log(`Pedido ${pedido._id} impreso y estado actualizado a 'Impreso'`);
             resolve();
