@@ -74,8 +74,8 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
 
       const date = new Date(timestamp);
 
-      doc.font("Helvetica");
-
+      doc.font("Helvetica")
+      .text("-----------------------------------", {})
       doc
         .fontSize(12)
         .text("Refresqueria Union del Valle", {
@@ -96,7 +96,8 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
         .text(`Mesera: ${pedido.Mesera}`, { align: 'left' })
         .moveDown(0.5)
         .text(`Pedido: ${pedido.Mensaje}`, { align: 'left' })
-        .text(`Powered by CODEX`, { align: 'right' });
+        .text(`Powered by CODEX`, { align: 'right' })
+        .text("-----------------------------------", {});
 
       doc.end();
 
