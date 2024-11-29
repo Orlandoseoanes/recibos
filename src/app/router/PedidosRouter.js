@@ -95,6 +95,10 @@ router.get("/pedidos/sin-imprimir", async (req, res) => {
         // Header
         doc
           .fontSize(12)
+          .text("Refresqueria Union del Valle", {
+            align: "center",
+            underline: true,
+          })
           .text("COMANDA", {
             align: "center",
             underline: true,
