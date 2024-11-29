@@ -72,7 +72,7 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
   try {
     const { impresora } = req.params;
 
-    const pedidos = await Pedido.find({ Estado: 'Sin imprimir' });
+    const pedidos = await pedido.find({ Estado: 'Sin imprimir' });
 
     if (pedidos.length === 0) {
       return res.status(404).json({ error: "No hay pedidos sin imprimir" });
