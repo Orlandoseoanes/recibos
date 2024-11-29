@@ -96,7 +96,7 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
         printPDF(outputPath, impresora);
 
         // Update order status
-        await Pedido.findByIdAndUpdate(pedido._id, { Estado: 'Impreso' });
+        await pedido.findByIdAndUpdate(pedido._id, { Estado: 'Impreso' });
 
         return {
           id: pedido._id,
