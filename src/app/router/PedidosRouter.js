@@ -59,7 +59,50 @@ const printPDFWindows = (filePath, printerName) => {
     console.log('PDF enviado a la impresora:', stdout);
   });
 };
+const generatePDF = (pedido, outputPath, timestamp) => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({
+      size: "A7",
+      margin: 10,
+    });
 
+    const writeStream = fs.createWriteStream(outputPath);
+    doc.pipe(writeStream);
+
+    const date = new Date(timestamp);
+
+    try {
+      doc.font("Helvetica")
+        .text("-----------------------------------", {})
+        .fontSize(12)
+        .text("Refresqueria Union del Valle", {
+          align: "center",
+          underline: true,
+        })
+        .text("COMANDA", {
+          align: "center",
+          underline: true,
+        })
+        .moveDown(0.5)
+        .fontSize(10)
+        .text(`Fecha: ${date.toLocaleDateString()}`, { align: 'left' })
+        .text(`Hora: ${date.toLocaleTimeString()}`, { align: 'left' })
+        .text(`Mesa: ${pedido.Mesa}`, { align: 'left' })
+        .text(`Mesera: ${pedido.Mesera}`, { align: 'left' })
+        .moveDown(0.5)
+        .text(`Pedido: ${pedido.Mensaje}`, { align: 'left' })
+        .text(`Powered by CODEX`, { align: 'right' })
+        .text("-----------------------------------", {});
+
+      doc.end();
+    } catch (error) {
+      return reject(error);
+    }
+
+    writeStream.on('finish', () => resolve());
+    writeStream.on('error', (error) => reject(error));
+  });
+};
 const printPDF = (filePath, printerName) => {
   const platform = process.platform;
   if (platform === 'win32') {
