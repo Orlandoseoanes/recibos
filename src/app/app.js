@@ -2,10 +2,12 @@ const express= require("express");
 const morgan =require("morgan");
 const app=express();
 const cors = require("cors"); // Agregar CORS
+const connectDB = require('../app/conexion');
 
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({extended:false}));
+connectDB();
 
 
 // Agregar middleware de CORS
