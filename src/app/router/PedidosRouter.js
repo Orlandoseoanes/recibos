@@ -73,7 +73,6 @@ const printPDF = (filePath, printerName) => {
 router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
   try {
     const { impresora } = req.params;
-
     const pedidos = await pedido.find({ Estado: 'Sin imprimir' });
 
     if (pedidos.length === 0) {
@@ -120,21 +119,32 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
 
       return new Promise((resolve, reject) => {
         writeStream.on('finish', async () => {
+          let printerError = null;
           try {
-            printPDF(outputPath, impresora);
+            // Wrap printer initialization in a try-catch
+            try {
+              printPDF(outputPath, impresora);
+            } catch (error) {
+              printerError = error;
+              console.error(`Error inicializando impresora ${impresora}:`, error);
+            }
             
-            // Use await with Mongoose model method
-            await pedido.findByIdAndUpdate(pedidoItem._id, { Estado: 'Impreso' });
+            // Update pedido state regardless of printing status
+            await pedido.findByIdAndUpdate(pedidoItem._id, { 
+              Estado: 'Impreso',
+              ErrorImpresion: printerError ? printerError.message : null
+            });
             
-            console.log(`Pedido ${pedidoItem._id} impreso y estado actualizado a 'Impreso'`);
+            console.log(`Pedido ${pedidoItem._id} procesado`);
             
             resolve({
               id: pedidoItem._id,
-              pdfPath: outputPath
+              pdfPath: outputPath,
+              impresionExitosa: !printerError
             });
-          } catch (printError) {
-            console.error("Error al imprimir el PDF o actualizar el estado:", printError);
-            reject(printError);
+          } catch (updateError) {
+            console.error("Error al actualizar el estado del pedido:", updateError);
+            reject(updateError);
           }
         });
       });
@@ -142,9 +152,15 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
 
     const results = await Promise.all(promises);
 
+    // Separate successful and failed prints
+    const exitosos = results.filter(r => r.impresionExitosa);
+    const fallidos = results.filter(r => !r.impresionExitosa);
+
     return res.status(200).json({
-      message: "Pedidos impresos correctamente y estado actualizado.",
-      pedidos: results
+      message: "Pedidos procesados",
+      pedidosExitosos: exitosos.length,
+      pedidosFallidos: fallidos.length,
+      detalles: results
     });
 
   } catch (error) {
@@ -152,6 +168,4 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
     return res.status(500).json({ error: "Error en el servidor" });
   }
 });
-
-
 module.exports = router;
