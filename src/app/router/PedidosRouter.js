@@ -80,9 +80,9 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
       return res.status(404).json({ error: "No hay pedidos sin imprimir" });
     }
 
-    const promises = pedidos.map(async (pedido) => {
+    const promises = pedidos.map(async (pedidoItem) => {
       const timestamp = Date.now();
-      const outputPath = path.join(__dirname, `pedido_${pedido._id}_${timestamp}.pdf`);
+      const outputPath = path.join(__dirname, `pedido_${pedidoItem._id}_${timestamp}.pdf`);
 
       const doc = new PDFDocument({
         size: "A7",
@@ -109,33 +109,35 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
         .fontSize(10)
         .text(`Fecha: ${date.toLocaleDateString()}`, { align: 'left' })
         .text(`Hora: ${date.toLocaleTimeString()}`, { align: 'left' })
-        .text(`Mesa: ${pedido.Mesa}`, { align: 'left' })
-        .text(`Mesera: ${pedido.Mesera}`, { align: 'left' })
+        .text(`Mesa: ${pedidoItem.Mesa}`, { align: 'left' })
+        .text(`Mesera: ${pedidoItem.Mesera}`, { align: 'left' })
         .moveDown(0.5)
-        .text(`Pedido: ${pedido.Mensaje}`, { align: 'left' })
+        .text(`Pedido: ${pedidoItem.Mensaje}`, { align: 'left' })
         .text(`Powered by CODEX`, { align: 'right' })
         .text("-----------------------------------", {});
 
       doc.end();
 
-      await new Promise((resolve, reject) => {
+      return new Promise((resolve, reject) => {
         writeStream.on('finish', async () => {
           try {
             printPDF(outputPath, impresora);
-            await pedido.findByIdAndUpdate(pedido._id, { Estado: 'Impreso' });
-            console.log(`Pedido ${pedido._id} impreso y estado actualizado a 'Impreso'`);
-            resolve();
+            
+            // Use await with Mongoose model method
+            await pedido.findByIdAndUpdate(pedidoItem._id, { Estado: 'Impreso' });
+            
+            console.log(`Pedido ${pedidoItem._id} impreso y estado actualizado a 'Impreso'`);
+            
+            resolve({
+              id: pedidoItem._id,
+              pdfPath: outputPath
+            });
           } catch (printError) {
             console.error("Error al imprimir el PDF o actualizar el estado:", printError);
             reject(printError);
           }
         });
       });
-
-      return {
-        id: pedido._id,
-        pdfPath: outputPath
-      };
     });
 
     const results = await Promise.all(promises);
@@ -150,5 +152,6 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
     return res.status(500).json({ error: "Error en el servidor" });
   }
 });
+
 
 module.exports = router;
