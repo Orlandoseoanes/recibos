@@ -62,16 +62,21 @@ const printPDFWindows = (filePath, printerName) => {
   });
 };
 
-const printPDF = (filePath, printerName) => {
-  const platform = process.platform;
-  if (platform === 'win32') {
-    printPDFWindows(filePath, printerName);
-  } else {
-    console.error('Sistema operativo no soportado para la impresión');
-  }
-};
-
-
+async function printPedido(outputPath, impresora) {
+  return new Promise((resolve, reject) => {
+    exec(`powershell -command "Start-Process -FilePath '${outputPath}' -Verb Print`, 
+      { encoding: 'utf8', maxBuffer: 1024 * 1024 },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(`Error de impresión: ${error.message}`);
+        }
+        if (stderr) {
+          reject(`Error de impresión: ${stderr}`);
+        }
+        resolve(stdout);
+      });
+  });
+}
 
 
 router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
@@ -125,36 +130,33 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
 
       return new Promise((resolve, reject) => {
         writeStream.on('finish', async () => {
-          let printerError = null;
           try {
-            // Windows-specific print command
-            try {
-              // Use Start-Process to print the PDF
-              execSync(`powershell -command "Start-Process -FilePath '${outputPath}' -Verb Print"`, 
-              { 
-                encoding: 'utf8',
-                maxBuffer: 1024 * 1024 // Increase buffer size
-              });
-              console.log(`Impresión enviada para pedido ${pedidoItem._id}`);
-            } catch (printError) {
-              printerError = printError;
-              console.error(`Error de impresión: ${printError}`);
-            }
+            // Imprimir el archivo PDF
+            await printPedido(outputPath, decodedImpresora);
 
-            // Update pedido state
+            // Esperar un poco antes de eliminar el archivo
+            setTimeout(() => {
+              fs.unlinkSync(outputPath);
+              console.log(`Archivo ${outputPath} borrado correctamente.`);
+            }, 5000); // 5 segundos de espera, ajusta según lo necesites
+
+            // Actualizar el estado del pedido
             await pedido.findByIdAndUpdate(pedidoItem._id, { 
-              Estado: 'Impreso',
-              ErrorImpresion: printerError ? printerError.message : null
+              Estado: 'Impreso'
             });
-            
+
             resolve({
               id: pedidoItem._id,
               pdfPath: outputPath,
-              impresionExitosa: !printerError
+              impresionExitosa: true
             });
-          } catch (updateError) {
-            console.error("Error al actualizar el estado del pedido:", updateError);
-            reject(updateError);
+          } catch (printError) {
+            console.error(`Error de impresión: ${printError}`);
+            await pedido.findByIdAndUpdate(pedidoItem._id, { 
+              Estado: 'Error en impresión',
+              ErrorImpresion: printError
+            });
+            reject(printError);
           }
         });
       });
@@ -162,14 +164,11 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
 
     const results = await Promise.all(promises);
 
-    // Separate successful and failed prints
-    const exitosos = results.filter(r => r.impresionExitosa);
-    const fallidos = results.filter(r => !r.impresionExitosa);
-
+    // Responder con los resultados de las impresiones
     return res.status(200).json({
       message: "Pedidos procesados",
-      pedidosExitosos: exitosos.length,
-      pedidosFallidos: fallidos.length,
+      pedidosExitosos: results.filter(r => r.impresionExitosa).length,
+      pedidosFallidos: results.filter(r => !r.impresionExitosa).length,
       detalles: results
     });
 
@@ -178,7 +177,6 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
     return res.status(500).json({ error: "Error en el servidor" });
   }
 });
-
 
 
 
