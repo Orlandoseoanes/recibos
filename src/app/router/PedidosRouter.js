@@ -6,6 +6,7 @@ const fs = require("fs");
 const timestamp = Date.now();
 const printer = require("pdf-to-printer");
 const pedido=require('../models/modelPedido')
+const { exec } = require('child_process'); // Importa el módulo child_process
 
 
 router.post("/pedidos/pedir", async (req, res) => {
@@ -49,10 +50,105 @@ router.get("/pedidos/sin-imprimir", async (req, res) => {
     return res.status(500).json({ error: "Error en el servidor" });
   }
 });
+const printPDFWindows = (filePath, printerName) => {
+  const command = `print /D:"${printerName}" "${filePath}"`;
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error('Error al imprimir el PDF:', err);
+      return;
+    }
+    console.log('PDF enviado a la impresora:', stdout);
+  });
+};
 
+const printPDF = (filePath, printerName) => {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    printPDFWindows(filePath, printerName);
+  } else {
+    console.error('Sistema operativo no soportado para la impresión');
+  }
+};
 
+router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
+  try {
+    const { impresora } = req.params;
 
+    const pedidos = await pedido.find({ Estado: 'Sin imprimir' });
 
+    if (pedidos.length === 0) {
+      return res.status(404).json({ error: "No hay pedidos sin imprimir" });
+    }
 
+    const promises = pedidos.map(async (pedido) => {
+      const timestamp = Date.now();
+      const outputPath = path.join(__dirname, `pedido_${pedido._id}_${timestamp}.pdf`);
+
+      const doc = new PDFDocument({
+        size: "A7",
+        margin: 10,
+      });
+
+      const writeStream = fs.createWriteStream(outputPath);
+      doc.pipe(writeStream);
+
+      const date = new Date(timestamp);
+
+      doc.font("Helvetica")
+        .text("-----------------------------------", {})
+        .fontSize(12)
+        .text("Refresqueria Union del Valle", {
+          align: "center",
+          underline: true,
+        })
+        .text("COMANDA", {
+          align: "center",
+          underline: true,
+        })
+        .moveDown(0.5)
+        .fontSize(10)
+        .text(`Fecha: ${date.toLocaleDateString()}`, { align: 'left' })
+        .text(`Hora: ${date.toLocaleTimeString()}`, { align: 'left' })
+        .text(`Mesa: ${pedido.Mesa}`, { align: 'left' })
+        .text(`Mesera: ${pedido.Mesera}`, { align: 'left' })
+        .moveDown(0.5)
+        .text(`Pedido: ${pedido.Mensaje}`, { align: 'left' })
+        .text(`Powered by CODEX`, { align: 'right' })
+        .text("-----------------------------------", {});
+
+      doc.end();
+
+      await new Promise((resolve, reject) => {
+        writeStream.on('finish', async () => {
+          try {
+            printPDF(outputPath, impresora);
+            await pedido.findByIdAndUpdate(pedido._id, { Estado: 'Impreso' });
+            console.log(`Pedido ${pedido._id} impreso y estado actualizado a 'Impreso'`);
+            resolve();
+          } catch (printError) {
+            console.error("Error al imprimir el PDF o actualizar el estado:", printError);
+            reject(printError);
+          }
+        });
+      });
+
+      return {
+        id: pedido._id,
+        pdfPath: outputPath
+      };
+    });
+
+    const results = await Promise.all(promises);
+
+    return res.status(200).json({
+      message: "Pedidos impresos correctamente y estado actualizado.",
+      pedidos: results
+    });
+
+  } catch (error) {
+    console.error("Error en la ruta /pedidos/Imprimir:", error);
+    return res.status(500).json({ error: "Error en el servidor" });
+  }
+});
 
 module.exports = router;
