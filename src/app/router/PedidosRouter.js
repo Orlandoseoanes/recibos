@@ -7,6 +7,7 @@ const timestamp = Date.now();
 const printer = require("pdf-to-printer");
 const pedido=require('../models/modelPedido')
 const { exec } = require('child_process'); // Importa el módulo child_process
+const { execSync } = require('child_process');
 
 
 router.post("/pedidos/pedir", async (req, res) => {
@@ -70,9 +71,14 @@ const printPDF = (filePath, printerName) => {
   }
 };
 
+
+
+
 router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
   try {
     const { impresora } = req.params;
+    const decodedImpresora = decodeURIComponent(impresora);
+
     const pedidos = await pedido.find({ Estado: 'Sin imprimir' });
 
     if (pedidos.length === 0) {
@@ -121,21 +127,25 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
         writeStream.on('finish', async () => {
           let printerError = null;
           try {
-            // Wrap printer initialization in a try-catch
+            // Windows-specific print command
             try {
-              printPDF(outputPath, impresora);
-            } catch (error) {
-              printerError = error;
-              console.error(`Error inicializando impresora ${impresora}:`, error);
+              // Use Start-Process to print the PDF
+              execSync(`powershell -command "Start-Process -FilePath '${outputPath}' -Verb Print"`, 
+              { 
+                encoding: 'utf8',
+                maxBuffer: 1024 * 1024 // Increase buffer size
+              });
+              console.log(`Impresión enviada para pedido ${pedidoItem._id}`);
+            } catch (printError) {
+              printerError = printError;
+              console.error(`Error de impresión: ${printError}`);
             }
-            
-            // Update pedido state regardless of printing status
+
+            // Update pedido state
             await pedido.findByIdAndUpdate(pedidoItem._id, { 
               Estado: 'Impreso',
               ErrorImpresion: printerError ? printerError.message : null
             });
-            
-            console.log(`Pedido ${pedidoItem._id} procesado`);
             
             resolve({
               id: pedidoItem._id,
@@ -166,6 +176,24 @@ router.get("/pedidos/Imprimir/:impresora", async (req, res) => {
   } catch (error) {
     console.error("Error en la ruta /pedidos/Imprimir:", error);
     return res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+
+
+
+// Diagnostic route to list printers
+router.get("/impresoras", (req, res) => {
+  try {
+    const printersOutput = execSync('powershell -command "Get-Printer | Select-Object Name"').toString();
+    const printers = printersOutput.split('\n')
+      .map(line => line.trim())
+      .filter(line => line && line !== 'Name' && line !== '----');
+    
+    res.json(printers);
+  } catch (error) {
+    console.error("Error listando impresoras:", error);
+    res.status(500).json({ error: "No se pudieron listar las impresoras" });
   }
 });
 module.exports = router;
