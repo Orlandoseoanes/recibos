@@ -6,7 +6,9 @@ const pedido=require('../models/modelPedido')
 
 router.post("/pedidos/pedir", async (req, res) => {
   try {
-    const { Mesera, Mesa, Mensaje } = req.body;
+    const { Mesera, Mesa, Mensaje,Categoria
+
+     } = req.body;
 
     if (!Mesera || !Mensaje) {
       return res.status(400).json({ error: "Mesera y Mensaje son requeridos" });
@@ -15,7 +17,8 @@ router.post("/pedidos/pedir", async (req, res) => {
     const newPedido = new pedido({
       Mesera,
       Mesa,
-      Mensaje
+      Mensaje,
+      Categoria
     });
 
     const savedPedido = await newPedido.save();
@@ -37,6 +40,7 @@ router.get("/pedidos/sin-imprimir", async (req, res) => {
       Mesera: pedido.Mesera,
       Mensaje: pedido.Mensaje,
       Mesa: pedido.Mesa,
+      Categoria:pedido.Categoria
     }));
 
     return res.status(200).json(formattedPedidos);
