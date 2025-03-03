@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const moment = require("moment-timezone");
 
 const pedidoSchema = new mongoose.Schema({
   Mesera: { type: String, required: true },
@@ -6,7 +7,7 @@ const pedidoSchema = new mongoose.Schema({
   Mensaje: { type: String, required: true },
   Estado: { type: String, default: 'Sin imprimir' },
   Categoria: {type:String,required:true},
-  fecha: { type:Date, default: Date.now } // Captura automática de la fecha y hora actual
+  fecha: { type:Date} 
 });
 
 const Pedido = mongoose.model('Pedido', pedidoSchema);
