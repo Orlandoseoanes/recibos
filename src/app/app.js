@@ -32,7 +32,7 @@ app.use("/api/v1",pedidosRouter);
 
 cron.schedule("*/10 * * * *", async () => {
     try {
-        const url = "https://recibos-4lfv.onrender.com/api/v1/pedidos/sin-imprimir"
+        const url = "https://recibos-fdrw.onrender.com/api/v1/pedidos/sin-imprimir"
         const respuesta = await axios.get(url);
         console.log("Manteniendo activo el servicio:", respuesta.status);
     } catch (error) {
